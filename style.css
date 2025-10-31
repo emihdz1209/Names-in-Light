@@ -1,0 +1,157 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: #000;
+    font-family: 'Georgia', serif;
+    overflow: hidden;
+    color: #fff;
+}
+
+#info-panel {
+    position: fixed;
+    right: -400px;
+    top: 0;
+    width: 400px;
+    height: 100vh;
+    background: rgba(10, 10, 15, 0.95);
+    backdrop-filter: blur(10px);
+    padding: 40px;
+    transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1000;
+    overflow-y: auto;
+    border-left: 1px solid rgba(255, 215, 130, 0.3);
+}
+
+#info-panel.active {
+    right: 0;
+}
+
+#info-panel h2 {
+    color: #ffd782;
+    font-size: 28px;
+    margin-bottom: 10px;
+    font-weight: 300;
+    letter-spacing: 1px;
+}
+
+#info-panel .date {
+    color: #999;
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+#info-panel .location {
+    color: #aaa;
+    font-size: 13px;
+    margin-bottom: 20px;
+    font-style: italic;
+}
+
+#info-panel .age {
+    color: #ffd782;
+    font-size: 16px;
+    margin-bottom: 20px;
+}
+
+#info-panel .summary {
+    line-height: 1.8;
+    color: #ddd;
+    font-size: 15px;
+    margin-bottom: 25px;
+}
+
+#info-panel .sources {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 215, 130, 0.2);
+}
+
+#info-panel .sources h3 {
+    color: #ffd782;
+    font-size: 14px;
+    margin-bottom: 15px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+#info-panel .source-link {
+    display: block;
+    color: #88ccff;
+    text-decoration: none;
+    margin-bottom: 12px;
+    font-size: 13px;
+    transition: color 0.3s;
+}
+
+#info-panel .source-link:hover {
+    color: #aaddff;
+    text-decoration: underline;
+}
+
+#close-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: none;
+    border: none;
+    color: #ffd782;
+    font-size: 30px;
+    cursor: pointer;
+    transition: transform 0.3s;
+}
+
+#close-btn:hover {
+    transform: rotate(90deg);
+}
+
+#title-overlay {
+    position: fixed;
+    top: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    z-index: 100;
+    pointer-events: none;
+}
+
+#title-overlay h1 {
+    font-size: 48px;
+    color: #ffd782;
+    font-weight: 300;
+    letter-spacing: 4px;
+    text-shadow: 0 0 20px rgba(255, 215, 130, 0.5);
+    margin-bottom: 10px;
+}
+
+#title-overlay p {
+    color: #aaa;
+    font-size: 14px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+#instructions {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #888;
+    font-size: 13px;
+    text-align: center;
+    z-index: 100;
+    pointer-events: none;
+}
+
+#loading {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #ffd782;
+    font-size: 20px;
+    z-index: 200;
+}

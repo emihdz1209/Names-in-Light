@@ -1,0 +1,361 @@
+let victims = [];
+let lights = [];
+let selectedLight = null;
+let rotationX = 0;
+let rotationY = 0;
+let targetRotX = 0;
+let targetRotY = 0;
+let dataLoaded = false;
+
+class Light {
+    constructor(victim, index, total) {
+        this.victim = victim;
+        
+        // Distribución en espiral 3D
+        let angle = (index / total) * Math.PI * 4;
+        let radius = 250 + Math.sin(index * 0.5) * 100;
+        let height = (index / total) * 400 - 200;
+        
+        this.x = Math.cos(angle) * radius;
+        this.y = height;
+        this.z = Math.sin(angle) * radius;
+        
+        this.size = 12; // Más grande
+        this.glowSize = 40; // Glow más amplio
+        this.hoverSize = 18; // Hover más notorio
+        this.pulseOffset = Math.random() * Math.PI * 2;
+        this.hovered = false;
+        this.currentSize = this.size;
+        this.currentGlow = this.glowSize;
+    }
+
+    update() {
+        let pulse = Math.sin(frameCount * 0.02 + this.pulseOffset) * 0.5 + 0.5;
+        this.currentSize = lerp(this.currentSize, this.hovered ? this.hoverSize : this.size, 0.1);
+        this.currentGlow = this.glowSize + pulse * 10;
+    }
+
+    display() {
+        push();
+        translate(this.x, this.y, this.z);
+        
+        // Outer glow (más brillante y visible)
+        noStroke();
+        fill(255, 215, 130, 80);
+        sphere(this.currentGlow * 1.2);
+        
+        fill(255, 215, 130, 120);
+        sphere(this.currentGlow * 0.8);
+        
+        fill(255, 230, 150, 200);
+        sphere(this.currentGlow * 0.5);
+        
+        // Core light (más brillante)
+        if (this.hovered) {
+            fill(255, 250, 220, 255);
+            sphere(this.currentSize * 1.3);
+        } else {
+            fill(255, 240, 200, 255);
+            sphere(this.currentSize);
+        }
+        
+        // Name label when hovered
+        if (this.hovered) {
+            push();
+            rotateY(-rotationY);
+            rotateX(-rotationX);
+            translate(0, -30, 0);
+            fill(255, 215, 130);
+            textAlign(CENTER, CENTER);
+            textSize(14);
+            textStyle(BOLD);
+            text(this.victim.display_name, 0, 0);
+            pop();
+        }
+        
+        pop();
+    }
+
+    checkHover(mx, my) {
+        let screenPos = this.getScreenPosition();
+        if (!screenPos) {
+            this.hovered = false;
+            return false;
+        }
+        
+        let d = dist(mx, my, screenPos.x, screenPos.y);
+        this.hovered = d < 50; // Área de detección más grande
+        return this.hovered;
+    }
+
+    getScreenPosition() {
+        let pos = createVector(this.x, this.y, this.z);
+        
+        // Apply rotations
+        let cosX = Math.cos(rotationX);
+        let sinX = Math.sin(rotationX);
+        let y1 = pos.y * cosX - pos.z * sinX;
+        let z1 = pos.y * sinX + pos.z * cosX;
+        
+        let cosY = Math.cos(rotationY);
+        let sinY = Math.sin(rotationY);
+        let x2 = pos.x * cosY + z1 * sinY;
+        let z2 = -pos.x * sinY + z1 * cosY;
+        
+        if (z2 > -100) return null; // Behind camera
+        
+        let scale = 300 / (300 + z2);
+        return {
+            x: width / 2 + x2 * scale,
+            y: height / 2 + y1 * scale
+        };
+    }
+}
+
+async function loadVictims() {
+    console.log('🔄 Iniciando carga de datos...');
+    
+    try {
+        console.log('🌐 Intentando fetch de API...');
+        let response = await fetch('https://69027e06b208b24affe6500d.mockapi.io/api/LID/Lights', {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+            }
+        });
+        
+        console.log('📡 Response status:', response.status);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        victims = await response.json();
+        console.log('✅ Datos cargados desde API:', victims.length, 'víctimas');
+        
+    } catch (error) {
+        console.error('❌ Error al cargar desde API:', error);
+        console.log('⚠️ Usando datos de respaldo embebidos...');
+        
+        // Fallback: usar datos embebidos
+        victims = [
+            {
+                "display_name": "George Perry Floyd Jr.",
+                "incident_date": "2020-05-25",
+                "location": {"city": "Minneapolis", "state_province": "Minnesota", "country": "US"},
+                "age": 46,
+                "summary": "Durante su arresto por un presunto billete falso, George Floyd fue inmovilizado por un oficial que se arrodilló sobre su cuello durante casi nueve minutos. Murió por asfixia, y su caso provocó protestas globales contra el racismo y la brutalidad policial.",
+                "source_primary": {"url": "https://www.telemundo.com/noticias/noticias-telemundo/tres-expolicias-minneapolis-son-hallados-culpables-de-violar-derechos-ncna1286787", "publisher": "Telemundo", "title": "Tres expolicías de Minneapolis son hallados culpables", "published_date": "2022-02-24"},
+                "sources_additional": [{"url": "https://www.latimes.com/espanol/eeuu/articulo/2023-05-26/aniversario-de-la-muerte-de-george-floyd", "publisher": "Los Angeles Times", "title": "Aniversario de la muerte de George Floyd", "published_date": "2023-05-26"}],
+                "verification_status": "verified"
+            },
+            {
+                "display_name": "Breonna Taylor",
+                "incident_date": "2020-03-13",
+                "location": {"city": "Louisville", "state_province": "Kentucky", "country": "US"},
+                "age": 26,
+                "summary": "Breonna Taylor dormía cuando la policía entró con una orden de allanamiento sin aviso. Tras un disparo del novio, los agentes respondieron con más de 20 tiros, ocho de los cuales impactaron en ella. Su caso impulsó reformas y protestas nacionales.",
+                "source_primary": {"url": "https://elpais.com/internacional/2025-07-22/condenado-a-tres-anos-de-carcel-el-expolicia-que-asesino-a-breonna-taylor.html", "publisher": "El País", "title": "Condenado a tres años el expolicía que mató a Breonna Taylor", "published_date": "2025-07-22"},
+                "sources_additional": [{"url": "https://www.latimes.com/espanol/internacional/articulo/2020-09-25/quien-era-breonna-taylor", "publisher": "Los Angeles Times", "title": "¿Quién era Breonna Taylor?", "published_date": "2020-09-25"}],
+                "verification_status": "verified"
+            },
+            {
+                "display_name": "Michael Brown Jr.",
+                "incident_date": "2014-08-09",
+                "location": {"city": "Ferguson", "state_province": "Missouri", "country": "US"},
+                "age": 18,
+                "summary": "Michael Brown, un joven desarmado, fue asesinado por un oficial tras ser sospechoso de un robo. Testigos afirmaron que tenía las manos en alto cuando le dispararon. Su caso desencadenó protestas y debates sobre el racismo estructural.",
+                "source_primary": {"url": "https://www.telemundo.com/noticias/noticias-telemundo/no-hay-cargos-para-el-ex-policia-que-mato-a-michael-brown-ncna123456", "publisher": "Telemundo", "title": "No hay cargos para el expolicía que mató a Michael Brown", "published_date": "2020-07-30"},
+                "sources_additional": [{"url": "https://www.univision.com/noticias/revelan-version-darren-wilson-sobre-muerte-michael-brown", "publisher": "Univision Noticias", "title": "Revelan versión de Darren Wilson", "published_date": "2014-11-25"}],
+                "verification_status": "verified"
+            },
+            {
+                "display_name": "Eric Garner",
+                "incident_date": "2014-07-17",
+                "location": {"city": "New York", "state_province": "New York", "country": "US"},
+                "age": 43,
+                "summary": "Eric Garner murió por asfixia tras ser sujetado con una llave de estrangulamiento por vender cigarrillos sin impuestos. Su frase 'No puedo respirar' se convirtió en un símbolo de las protestas contra la violencia policial.",
+                "source_primary": {"url": "https://elpais.com/internacional/2019/05/15/actualidad/1557924574_761682.html", "publisher": "El País", "title": "El policía acusado de asfixiar a Eric Garner se enfrenta a juicio", "published_date": "2019-05-15"},
+                "sources_additional": [{"url": "https://vanguardiadelpueblo.do/2014/11/continua-investigacion-por-muerte-de-afroamericano-en-nueva-york/", "publisher": "Vanguardia del Pueblo", "title": "Continúa investigación por muerte de afroamericano", "published_date": "2014-11-29"}],
+                "verification_status": "verified"
+            },
+            {
+                "display_name": "Tamir Rice",
+                "incident_date": "2014-11-22",
+                "location": {"city": "Cleveland", "state_province": "Ohio", "country": "US"},
+                "age": 12,
+                "summary": "Tamir Rice, un niño afroamericano, fue asesinado por un policía mientras jugaba con una pistola de juguete. Fue abatido segundos después de la llegada policial. No hubo cargos penales, pero su caso impulsó demandas de reforma.",
+                "source_primary": {"url": "https://elpais.com/internacional/2015/12/29/estados_unidos/1451395040_537853.html", "publisher": "El País", "title": "Gran jurado exime al policía que mató a Tamir Rice", "published_date": "2015-12-29"},
+                "sources_additional": [{"url": "https://www.telemundo.com/noticias/noticias-telemundo/despiden-policia-que-mato-a-tamir-rice-ncna987654", "publisher": "Telemundo", "title": "Despiden al policía que mató a Tamir Rice", "published_date": "2017-05-30"}],
+                "verification_status": "verified"
+            },
+            {
+                "display_name": "Trayvon Benjamin Martin",
+                "incident_date": "2012-02-26",
+                "location": {"city": "Sanford", "state_province": "Florida", "country": "US"},
+                "age": 17,
+                "summary": "Trayvon Martin, un adolescente afroamericano, fue asesinado por un vigilante vecinal mientras regresaba a casa. El agresor no fue detenido inicialmente, y su absolución impulsó el nacimiento del movimiento Black Lives Matter.",
+                "source_primary": {"url": "https://elpais.com/internacional/2012/03/20/actualidad/1332211014_544215.html", "publisher": "El País", "title": "La muerte de un joven negro reabre debate racial", "published_date": "2012-03-20"},
+                "sources_additional": [{"url": "https://junior-report.media/cinco-anos-del-asesinato-de-george-floyd/", "publisher": "SOS Racisme / Junior Report", "title": "Cinco años del asesinato de George Floyd", "published_date": "2025-06-05"}],
+                "verification_status": "verified"
+            }
+        ];
+    }
+    
+    // Create lights
+    console.log('💡 Creando', victims.length, 'luces...');
+    for (let i = 0; i < victims.length; i++) {
+        lights.push(new Light(victims[i], i, victims.length));
+    }
+    
+    console.log('✅ Memorial listo con', lights.length, 'luces');
+    dataLoaded = true;
+    document.getElementById('loading').style.display = 'none';
+}
+
+function setup() {
+    console.log('🎨 Setup iniciado');
+    let canvas = createCanvas(windowWidth, windowHeight, WEBGL);
+    console.log('📐 Canvas creado:', windowWidth, 'x', windowHeight);
+    loadVictims();
+}
+
+function draw() {
+    background(5, 5, 10);
+    
+    if (!dataLoaded) {
+        return;
+    }
+    
+    // Smooth rotation
+    rotationX = lerp(rotationX, targetRotX, 0.1);
+    rotationY = lerp(rotationY, targetRotY, 0.1);
+    
+    // Apply rotation
+    rotateX(rotationX);
+    rotateY(rotationY);
+    
+    // Ambient particles (más brillantes)
+    for (let i = 0; i < 50; i++) {
+        let x = (noise(i * 0.1, frameCount * 0.001) - 0.5) * 800;
+        let y = (noise(i * 0.1 + 100, frameCount * 0.001) - 0.5) * 800;
+        let z = (noise(i * 0.1 + 200, frameCount * 0.001) - 0.5) * 800;
+        
+        push();
+        translate(x, y, z);
+        noStroke();
+        fill(150, 150, 200, 80); // Más brillante
+        sphere(3); // Más grande
+        pop();
+    }
+    
+    // Update and display lights
+    for (let light of lights) {
+        light.update();
+        light.display();
+    }
+    
+    // Connection lines between nearby lights (más visibles)
+    stroke(255, 215, 130, 40); // Más opacidad
+    strokeWeight(1.5);
+    for (let i = 0; i < lights.length; i++) {
+        for (let j = i + 1; j < lights.length; j++) {
+            let d = dist(lights[i].x, lights[i].y, lights[i].z, 
+                        lights[j].x, lights[j].y, lights[j].z);
+            if (d < 200) {
+                line(lights[i].x, lights[i].y, lights[i].z,
+                     lights[j].x, lights[j].y, lights[j].z);
+            }
+        }
+    }
+}
+
+function mouseMoved() {
+    if (!dataLoaded) return;
+    
+    // Update rotation based on mouse
+    targetRotX = map(mouseY, 0, height, -PI / 3, PI / 3);
+    targetRotY = map(mouseX, 0, width, -PI / 3, PI / 3);
+    
+    // Check hover
+    for (let light of lights) {
+        light.checkHover(mouseX, mouseY);
+    }
+}
+
+function mousePressed() {
+    if (!dataLoaded) return;
+    
+    console.log('🖱️ Click detectado en:', mouseX, mouseY);
+    
+    let clickedAny = false;
+    for (let light of lights) {
+        if (light.hovered) {
+            console.log('✨ Luz seleccionada:', light.victim.display_name);
+            showInfo(light.victim);
+            clickedAny = true;
+            return;
+        }
+    }
+    
+    if (!clickedAny) {
+        console.log('❌ No se detectó ninguna luz cercana');
+    }
+}
+
+function showInfo(victim) {
+    let panel = document.getElementById('info-panel');
+    let content = document.getElementById('panel-content');
+    
+    let html = `
+        <h2>${victim.display_name}</h2>
+        <div class="date">${new Date(victim.incident_date).toLocaleDateString('es-ES', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        })}</div>
+        <div class="location">${victim.location.city}, ${victim.location.state_province}</div>
+        <div class="age">${victim.age} años</div>
+        <div class="summary">${victim.summary}</div>
+    `;
+    
+    if (victim.source_primary || victim.sources_additional) {
+        html += '<div class="sources"><h3>Fuentes</h3>';
+        
+        if (victim.source_primary) {
+            html += `<a href="${victim.source_primary.url}" target="_blank" class="source-link">
+                ${victim.source_primary.publisher} - ${victim.source_primary.title}
+            </a>`;
+        }
+        
+        if (victim.sources_additional) {
+            victim.sources_additional.forEach(source => {
+                html += `<a href="${source.url}" target="_blank" class="source-link">
+                    ${source.publisher} - ${source.title}
+                </a>`;
+            });
+        }
+        
+        html += '</div>';
+    }
+    
+    content.innerHTML = html;
+    panel.classList.add('active');
+}
+
+// Inicializar el botón de cierre cuando el DOM esté listo
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCloseButton);
+} else {
+    initCloseButton();
+}
+
+function initCloseButton() {
+    document.getElementById('close-btn').addEventListener('click', () => {
+        document.getElementById('info-panel').classList.remove('active');
+    });
+}
+
+function windowResized() {
+    resizeCanvas(windowWidth, windowHeight);
+}

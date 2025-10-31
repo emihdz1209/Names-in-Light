@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Names in Light - Memorial Digital</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #000;
+            font-family: 'Georgia', serif;
+            overflow: hidden;
+            color: #fff;
+        }
+        canvas {
+            display: block;
+            cursor: pointer;
+        }
+        #info-panel {
+            position: fixed;
+            right: -420px;
+            top: 0;
+            width: 420px;
+            height: 100vh;
+            background: rgba(10, 10, 15, 0.98);
+            backdrop-filter: blur(10px);
+            padding: 40px;
+            transition: right 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1000;
+            overflow-y: auto;
+            border-left: 2px solid rgba(255, 215, 130, 0.4);
+            box-shadow: -10px 0 30px rgba(0, 0, 0, 0.8);
+        }
+        #info-panel.active {
+            right: 0;
+        }
+        #info-panel h2 {
+            color: #ffd782;
+            font-size: 26px;
+            margin-bottom: 12px;
+            font-weight: 400;
+            letter-spacing: 0.5px;
+            line-height: 1.3;
+        }
+        #info-panel .date {
+            color: #999;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        #info-panel .location {
+            color: #aaa;
+            font-size: 13px;
+            margin-bottom: 20px;
+            font-style: italic;
+        }
+        #info-panel .age {
+            color: #ffd782;
+            font-size: 16px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        #info-panel .summary {
+            line-height: 1.8;
+            color: #ddd;
+            font-size: 15px;
+            margin-bottom: 25px;
+        }
+        #info-panel .sources {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 215, 130, 0.2);
+        }
+        #info-panel .sources h3 {
+            color: #ffd782;
+            font-size: 13px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        #info-panel .source-link {
+            display: block;
+            color: #88ccff;
+            text-decoration: none;
+            margin-bottom: 12px;
+            font-size: 13px;
+            transition: color 0.3s;
+            padding: 8px;
+            background: rgba(136, 204, 255, 0.05);
+            border-radius: 4px;
+        }
+        #info-panel .source-link:hover {
+            color: #aaddff;
+            background: rgba(136, 204, 255, 0.1);
+        }
+        #close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 215, 130, 0.1);
+            border: 2px solid #ffd782;
+            color: #ffd782;
+            font-size: 28px;
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+        #close-btn:hover {
+            transform: rotate(90deg);
+            background: rgba(255, 215, 130, 0.2);
+        }
+        #title-overlay {
+            position: fixed;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            z-index: 100;
+            pointer-events: none;
+        }
+        #title-overlay h1 {
+            font-size: 48px;
+            color: #ffd782;
+            font-weight: 300;
+            letter-spacing: 8px;
+            text-shadow: 0 0 30px rgba(255, 215, 130, 0.6);
+            margin-bottom: 10px;
+        }
+        #title-overlay p {
+            color: #aaa;
+            font-size: 14px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+        #instructions {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #888;
+            font-size: 13px;
+            text-align: center;
+            z-index: 100;
+            pointer-events: none;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 12px 24px;
+            border-radius: 20px;
+        }
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ffd782;
+            font-size: 20px;
+            z-index: 200;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">Cargando memorial...</div>
+    
+    <div id="title-overlay">
+        <h1>NAMES IN LIGHT</h1>
+        <p>Memorial Digital</p>
+    </div>
+
+    <div id="instructions">
+        Arrastra para rotar • Click en las luces para conocer sus historias
+    </div>
+
+    <div id="info-panel">
+        <button id="close-btn">×</button>
+        <div id="panel-content"></div>
+    </div>
+
+    <script>
+        // Variables globales
+        let victims = [];
+        let lights = [];
+        let rotationX = 0;
+        let rotationY = 0;
+        let targetRotX = 0;
+        let targetRotY = 0;
+        let dataLoaded = false;
+        let cam;
+
+        class Light {
+            constructor(victim, index, total) {
+                this.victim = victim;
+                
+                // Distribución en espiral 3D
+                let angle = (index / total) * Math.PI * 4;
+                let radius = 200 + Math.sin(index * 0.5) * 80;
+                let height = (index / total) * 300 - 150;
+                
+                this.x = Math.cos(angle) * radius;
+                this.y = height;
+                this.z = Math.sin(angle) * radius;
+                
+                this.size = 15;
+                this.glowSize = 35;
+                this.hoverSize = 25;
+                this.pulseOffset = Math.random() * Math.PI * 2;
+                this.hovered = false;
+                this.currentSize = this.size;
+                this.currentGlow = this.glowSize;
+            }
+
+            update() {
+                let pulse = Math.sin(frameCount * 0.02 + this.pulseOffset) * 0.5 + 0.5;
+                this.currentSize = lerp(this.currentSize, this.hovered ? this.hoverSize : this.size, 0.2);
+                this.currentGlow = this.glowSize + pulse * 15;
+            }
+
+            display() {
+                push();
+                translate(this.x, this.y, this.z);
+                
+                // Glow layers
+                noStroke();
+                
+                // Outer glow
+                fill(255, 180, 80, 40);
+                sphere(this.currentGlow * 1.5);
+                
+                fill(255, 200, 100, 80);
+                sphere(this.currentGlow);
+                
+                fill(255, 220, 130, 150);
+                sphere(this.currentGlow * 0.6);
+                
+                // Core
+                if (this.hovered) {
+                    fill(255, 250, 220);
+                    sphere(this.currentSize);
+                    
+                    // Halo extra
+                    fill(255, 240, 200, 100);
+                    sphere(this.currentSize * 1.5);
+                } else {
+                    fill(255, 240, 200);
+                    sphere(this.currentSize);
+                }
+                
+                pop();
+            }
+
+            isNear(mx, my) {
+                // Proyección 3D a 2D simplificada
+                let screenPos = createVector(this.x, this.y, this.z);
+                
+                // Rotaciones aplicadas
+                let cosX = Math.cos(rotationX);
+                let sinX = Math.sin(rotationX);
+                let y1 = screenPos.y * cosX - screenPos.z * sinX;
+                let z1 = screenPos.y * sinX + screenPos.z * cosX;
+                
+                let cosY = Math.cos(rotationY);
+                let sinY = Math.sin(rotationY);
+                let x2 = screenPos.x * cosY + z1 * sinY;
+                let z2 = -screenPos.x * sinY + z1 * cosY;
+                
+                // Si está detrás de la cámara
+                if (z2 > -50) return false;
+                
+                // Proyección perspectiva
+                let scale = 400 / (400 + z2);
+                let sx = width/2 + x2 * scale;
+                let sy = height/2 + y1 * scale;
+                
+                let d = dist(mx, my, sx, sy);
+                return d < 60; // Radio de detección aumentado
+            }
+        }
+
+        async function loadVictims() {
+            console.log('🔄 Cargando datos...');
+            
+            // Datos embebidos directamente
+            victims = [
+                {"display_name":"George Perry Floyd Jr.","incident_date":"2020-05-25","location":{"city":"Minneapolis","state_province":"Minnesota","country":"US"},"age":46,"summary":"Durante su arresto por un presunto billete falso, George Floyd fue inmovilizado por un oficial que se arrodilló sobre su cuello durante casi nueve minutos. Murió por asfixia, y su caso provocó protestas globales contra el racismo y la brutalidad policial.","source_primary":{"url":"https://www.telemundo.com/noticias/noticias-telemundo/tres-expolicias-minneapolis-son-hallados-culpables-de-violar-derechos-ncna1286787","publisher":"Telemundo","title":"Tres expolicías de Minneapolis son hallados culpables","published_date":"2022-02-24"},"sources_additional":[{"url":"https://www.latimes.com/espanol/eeuu/articulo/2023-05-26/aniversario-de-la-muerte-de-george-floyd","publisher":"Los Angeles Times","title":"Aniversario de la muerte de George Floyd","published_date":"2023-05-26"}]},
+                {"display_name":"Breonna Taylor","incident_date":"2020-03-13","location":{"city":"Louisville","state_province":"Kentucky","country":"US"},"age":26,"summary":"Breonna Taylor dormía cuando la policía entró con una orden de allanamiento sin aviso. Tras un disparo del novio, los agentes respondieron con más de 20 tiros, ocho de los cuales impactaron en ella. Su caso impulsó reformas y protestas nacionales.","source_primary":{"url":"https://elpais.com/internacional/2025-07-22/condenado-a-tres-anos-de-carcel-el-expolicia-que-asesino-a-breonna-taylor.html","publisher":"El País","title":"Condenado a tres años el expolicía que mató a Breonna Taylor","published_date":"2025-07-22"},"sources_additional":[{"url":"https://www.latimes.com/espanol/internacional/articulo/2020-09-25/quien-era-breonna-taylor","publisher":"Los Angeles Times","title":"¿Quién era Breonna Taylor?","published_date":"2020-09-25"}]},
+                {"display_name":"Michael Brown Jr.","incident_date":"2014-08-09","location":{"city":"Ferguson","state_province":"Missouri","country":"US"},"age":18,"summary":"Michael Brown, un joven desarmado, fue asesinado por un oficial tras ser sospechoso de un robo. Testigos afirmaron que tenía las manos en alto cuando le dispararon. Su caso desencadenó protestas y debates sobre el racismo estructural.","source_primary":{"url":"https://www.telemundo.com/noticias/noticias-telemundo/no-hay-cargos-para-el-ex-policia-que-mato-a-michael-brown-ncna123456","publisher":"Telemundo","title":"No hay cargos para el expolicía que mató a Michael Brown","published_date":"2020-07-30"},"sources_additional":[{"url":"https://www.univision.com/noticias/revelan-version-darren-wilson-sobre-muerte-michael-brown","publisher":"Univision Noticias","title":"Revelan versión de Darren Wilson","published_date":"2014-11-25"}]},
+                {"display_name":"Eric Garner","incident_date":"2014-07-17","location":{"city":"New York","state_province":"New York","country":"US"},"age":43,"summary":"Eric Garner murió por asfixia tras ser sujetado con una llave de estrangulamiento por vender cigarrillos sin impuestos. Su frase 'No puedo respirar' se convirtió en un símbolo de las protestas contra la violencia policial.","source_primary":{"url":"https://elpais.com/internacional/2019/05/15/actualidad/1557924574_761682.html","publisher":"El País","title":"El policía acusado de asfixiar a Eric Garner se enfrenta a juicio","published_date":"2019-05-15"},"sources_additional":[{"url":"https://vanguardiadelpueblo.do/2014/11/continua-investigacion-por-muerte-de-afroamericano-en-nueva-york/","publisher":"Vanguardia del Pueblo","title":"Continúa investigación por muerte de afroamericano","published_date":"2014-11-29"}]},
+                {"display_name":"Tamir Rice","incident_date":"2014-11-22","location":{"city":"Cleveland","state_province":"Ohio","country":"US"},"age":12,"summary":"Tamir Rice, un niño afroamericano, fue asesinado por un policía mientras jugaba con una pistola de juguete. Fue abatido segundos después de la llegada policial. No hubo cargos penales, pero su caso impulsó demandas de reforma.","source_primary":{"url":"https://elpais.com/internacional/2015/12/29/estados_unidos/1451395040_537853.html","publisher":"El País","title":"Gran jurado exime al policía que mató a Tamir Rice","published_date":"2015-12-29"},"sources_additional":[{"url":"https://www.telemundo.com/noticias/noticias-telemundo/despiden-policia-que-mato-a-tamir-rice-ncna987654","publisher":"Telemundo","title":"Despiden al policía que mató a Tamir Rice","published_date":"2017-05-30"}]},
+                {"display_name":"Trayvon Benjamin Martin","incident_date":"2012-02-26","location":{"city":"Sanford","state_province":"Florida","country":"US"},"age":17,"summary":"Trayvon Martin, un adolescente afroamericano, fue asesinado por un vigilante vecinal mientras regresaba a casa. El agresor no fue detenido inicialmente, y su absolución impulsó el nacimiento del movimiento Black Lives Matter.","source_primary":{"url":"https://elpais.com/internacional/2012/03/20/actualidad/1332211014_544215.html","publisher":"El País","title":"La muerte de un joven negro reabre debate racial","published_date":"2012-03-20"},"sources_additional":[{"url":"https://junior-report.media/cinco-anos-del-asesinato-de-george-floyd/","publisher":"SOS Racisme / Junior Report","title":"Cinco años del asesinato de George Floyd","published_date":"2025-06-05"}]}
+            ];
+            
+            for (let i = 0; i < victims.length; i++) {
+                lights.push(new Light(victims[i], i, victims.length));
+            }
+            
+            console.log('✅ Memorial listo:', lights.length, 'luces');
+            dataLoaded = true;
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function setup() {
+            createCanvas(windowWidth, windowHeight, WEBGL);
+            cam = createCamera();
+            cam.setPosition(0, 0, 800);
+            loadVictims();
+        }
+
+        function draw() {
+            background(5, 5, 12);
+            
+            if (!dataLoaded) return;
+            
+            // Suavizar rotación
+            rotationX = lerp(rotationX, targetRotX, 0.08);
+            rotationY = lerp(rotationY, targetRotY, 0.08);
+            
+            rotateX(rotationX);
+            rotateY(rotationY);
+            
+            // Partículas ambiente
+            for (let i = 0; i < 40; i++) {
+                let x = (noise(i * 0.1, frameCount * 0.001) - 0.5) * 700;
+                let y = (noise(i * 0.1 + 100, frameCount * 0.001) - 0.5) * 700;
+                let z = (noise(i * 0.1 + 200, frameCount * 0.001) - 0.5) * 700;
+                
+                push();
+                translate(x, y, z);
+                noStroke();
+                fill(120, 130, 180, 60);
+                sphere(2.5);
+                pop();
+            }
+            
+            // Luces y conexiones
+            for (let light of lights) {
+                light.update();
+                light.display();
+            }
+            
+            // Líneas de conexión
+            stroke(255, 200, 100, 50);
+            strokeWeight(1);
+            for (let i = 0; i < lights.length; i++) {
+                for (let j = i + 1; j < lights.length; j++) {
+                    let d = dist(lights[i].x, lights[i].y, lights[i].z, 
+                                lights[j].x, lights[j].y, lights[j].z);
+                    if (d < 180) {
+                        line(lights[i].x, lights[i].y, lights[i].z,
+                             lights[j].x, lights[j].y, lights[j].z);
+                    }
+                }
+            }
+        }
+
+        function mouseMoved() {
+            if (!dataLoaded) return;
+            
+            targetRotX = map(mouseY, 0, height, -PI/4, PI/4);
+            targetRotY = map(mouseX, 0, width, -PI/4, PI/4);
+            
+            // Actualizar hover
+            let hoveredAny = false;
+            for (let light of lights) {
+                light.hovered = light.isNear(mouseX, mouseY);
+                if (light.hovered) {
+                    hoveredAny = true;
+                    cursor('pointer');
+                }
+            }
+            if (!hoveredAny) cursor('default');
+        }
+
+        function mousePressed() {
+            if (!dataLoaded) return;
+            
+            for (let light of lights) {
+                if (light.hovered) {
+                    console.log('✨ Abriendo:', light.victim.display_name);
+                    showInfo(light.victim);
+                    return;
+                }
+            }
+        }
+
+        function showInfo(victim) {
+            let panel = document.getElementById('info-panel');
+            let content = document.getElementById('panel-content');
+            
+            let html = `
+                <h2>${victim.display_name}</h2>
+                <div class="date">${new Date(victim.incident_date).toLocaleDateString('es-ES', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                })}</div>
+                <div class="location">${victim.location.city}, ${victim.location.state_province}</div>
+                <div class="age">${victim.age} años</div>
+                <div class="summary">${victim.summary}</div>
+            `;
+            
+            if (victim.source_primary || victim.sources_additional) {
+                html += '<div class="sources"><h3>Fuentes</h3>';
+                
+                if (victim.source_primary) {
+                    html += `<a href="${victim.source_primary.url}" target="_blank" class="source-link">
+                        📰 ${victim.source_primary.publisher} - ${victim.source_primary.title}
+                    </a>`;
+                }
+                
+                if (victim.sources_additional) {
+                    victim.sources_additional.forEach(source => {
+                        html += `<a href="${source.url}" target="_blank" class="source-link">
+                            📰 ${source.publisher} - ${source.title}
+                        </a>`;
+                    });
+                }
+                
+                html += '</div>';
+            }
+            
+            content.innerHTML = html;
+            panel.classList.add('active');
+        }
+
+        document.getElementById('close-btn').addEventListener('click', () => {
+            document.getElementById('info-panel').classList.remove('active');
+        });
+
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+        }
+    </script>
+</body>
+</html>
